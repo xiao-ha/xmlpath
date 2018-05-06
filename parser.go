@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"io"
 	"strings"
+	"bytes"
 )
 
 // Node is an item in an xml tree that was compiled to
@@ -28,6 +29,9 @@ type Node struct {
 
 	up   *Node
 	down []*Node
+
+	//add by xh 20180506
+	htmlNode *html.Node
 }
 
 type nodeKind int
@@ -41,6 +45,22 @@ const (
 	commentNode
 	procInstNode
 )
+
+// *html.Node returns the html node of node.
+
+func (node *Node) HtmlNode() *html.Node {
+	return node.htmlNode
+}
+
+func (node *Node) Html() string {
+	if node.HtmlNode() != nil{
+		var buf bytes.Buffer
+		w := io.Writer(&buf)
+		html.Render( w, node.HtmlNode())
+		return buf.String()
+	}
+	return ""
+}
 
 // String returns the string value of node.
 //
@@ -305,12 +325,16 @@ func ParseHTML(r io.Reader) (*Node, error) {
 			nodes = append(nodes, Node{
 				kind: startNode,
 				name: xml.Name{Local: n.Data, Space: n.Namespace},
+				// add by xh 20180506
+				htmlNode:n,
 			})
 			for _, attr := range n.Attr {
 				nodes = append(nodes, Node{
 					kind: attrNode,
 					name: xml.Name{Local: attr.Key, Space: attr.Namespace},
 					attr: attr.Val,
+					// add by xh 20180506
+					htmlNode:n,
 				})
 			}
 		case html.TextNode:
@@ -319,6 +343,8 @@ func ParseHTML(r io.Reader) (*Node, error) {
 			nodes = append(nodes, Node{
 				kind: textNode,
 				text: text[texti : texti+len(n.Data)],
+				// add by xh 20180506
+				htmlNode:n,
 			})
 		case html.CommentNode:
 			texti := len(text)
@@ -326,6 +352,8 @@ func ParseHTML(r io.Reader) (*Node, error) {
 			nodes = append(nodes, Node{
 				kind: commentNode,
 				text: text[texti : texti+len(n.Data)],
+				// add by xh 20180506
+				htmlNode:n,
 			})
 		}
 
@@ -336,7 +364,8 @@ func ParseHTML(r io.Reader) (*Node, error) {
 
 		for n != nil {
 			if n.Type == html.ElementNode {
-				nodes = append(nodes, Node{kind: endNode})
+				// modify by xh 20180506
+				nodes = append(nodes, Node{kind: endNode , htmlNode:n})
 			}
 			if n.NextSibling != nil {
 				n = n.NextSibling
